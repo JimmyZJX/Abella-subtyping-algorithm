@@ -1,0 +1,618 @@
+Import "order".
+
+%region Declarative System with List of Judgments
+Type subt ty -> ty -> o.
+
+% sub_list : env -> [sub_expr] -> prop
+Define subl : olist -> olist -> prop by
+	subl E nil;
+	subl E (subt A B :: Exp) := sub E A B /\ subl E Exp.
+
+% wft_list : env -> [sub_expr] -> prop
+Define wftl : olist -> olist -> prop by
+	wftl E nil;
+	wftl E (subt A B :: Exp) := wft E A /\ wft E B /\ wftl E Exp.
+
+Theorem wftl_subst : forall E Exp X m, env E ->
+	wftl E (Exp X) -> wft E m -> wftl E (Exp m).
+induction on 2. intros. case H2.
+	case H4. search.
+	case H4. apply IH to H1 H7 H3 with Exp = Exp3.
+		case H8. unfold.
+			backchain wft_subst with T = Exp4.
+			backchain wft_subst with T = Exp5.
+			search.
+
+Theorem wftl_prune : forall E Exp, nabla (x : ty),
+	wftl E (Exp x) -> exists Exr, Exp = x\Exr.
+induction on 1. intros. case H1. search.
+	apply IH to H4. apply wft_prune to H2. apply wft_prune to H3. search.
+
+Theorem subl_strenthen_bound_f : forall E Exp, nabla x,
+	env E -> subl (bound x :: E) Exp -> subl E Exp.
+induction on 2. intros. case H2. search. apply IH to H1 H4.
+	apply sub_strenthen_bound_f to _ H3. search.
+%endregion
+
+Type exvar  ty -> o.
+
+Define enva : olist -> prop by
+	enva nil;
+	nabla x, enva (bound x :: E) := enva E;
+	nabla x, enva (exvar x :: E) := enva E.
+
+%region Algorithmic Environment Meta-theories
+Theorem enva_rev : forall X E, enva (X :: E) -> enva E.
+intros. case H1. search. search.
+
+Theorem enva_weaken : forall F E FE, append F E FE -> enva FE -> enva F /\ enva E.
+induction on 2. intros. case H2.
+	case H1. search.
+	case H1. search. apply append_prune to H4.
+		apply IH to H4 H3. search.
+	case H1. search. apply append_prune to H4.
+		apply IH to H4 H3. search.
+
+Theorem enva_weaken_mid : forall F E FxE FE X, append F (X :: E) FxE -> enva FxE ->
+	append F E FE -> enva FE.
+induction on 1. intros. case H1.
+	apply enva_rev to H2. case H3. search.
+	case H2. apply append_prune to H4. case H3. apply IH to H4 H5 H6.
+		apply append_prune_AB to H6. search.
+		apply append_prune to H4. case H3. apply IH to H4 H5 H6.
+		apply append_prune_AB to H6. search.
+
+Theorem enva_weaken_all_thm : forall E F G EG EFG, append E G EG -> split3 E F G EFG ->
+	enva F -> enva EFG -> enva EG.
+induction on 3. intros. case H3.
+	apply split3_alt_inv to H2. case H5. apply append_det to *H6 H1. search.
+	case H2 (keep). apply append_assoc_inv to _ H6 with B = bound n1 :: nil.
+		apply append_total_E to H9 with B = G n1. apply IH to H10 _ H5 _.
+		apply append_assoc to H8 H10. case H12. case H14.
+			backchain enva_weaken_mid with FxE = C n1.
+	case H2 (keep). apply append_assoc_inv to _ H6 with B = exvar n1 :: nil.
+		apply append_total_E to H9 with B = G n1. apply IH to H10 _ H5 _.
+		apply append_assoc to H8 H10. case H12. case H14.
+			backchain enva_weaken_mid with FxE = C n1.
+Theorem enva_weaken_all : forall E F G EG EFG, append E G EG -> split3 E F G EFG ->
+	enva EFG -> enva EG.
+intros. backchain enva_weaken_all_thm. case H2. apply enva_weaken to H5 _.
+	apply enva_weaken to H4 _. search.
+
+Theorem enva_strenthen_mid : forall F E FxE FE, nabla x,
+	append F (bound x :: E) (FxE x) \/ append F (exvar x :: E) (FxE x) ->
+	append F E FE -> enva FE -> enva (FxE x).
+induction on 2. intros. case H2.
+	case H1. case H4. search. case H4. search.
+	case H1.
+		case H5. case H3.
+			apply append_prune to H4. apply append_prune_AB to H6.
+				unfold. backchain IH.
+			apply append_prune to H4. apply append_prune_AB to H6.
+				unfold. backchain IH.
+		case H5. case H3.
+			apply append_prune to H4. apply append_prune_AB to H6.
+				unfold. backchain IH.
+			apply append_prune to H4. apply append_prune_AB to H6.
+				unfold. backchain IH.
+
+Theorem enva_member_prune : forall E B, nabla (x : ty),
+	member (B x) E -> exists Fr, B = x\Fr.
+induction on 1. intros. case H1.
+	search. apply IH to H2. search.
+
+Theorem enva_bound_exvar : forall E X,
+	enva E -> member (bound X) E -> member (exvar X) E -> false.
+induction on 1. intros. case H1.
+	case H2.
+	case H2. case H3. apply enva_member_prune to H5.
+		case H3. apply IH to H4 H5 H6.
+	case H2. case H3. apply enva_member_prune to H5.
+		apply IH to H4 H5 H6.
+
+Theorem enva_nabla_prune_bound : forall F E FxE, nabla x,
+	append (F x) (bound x :: E x) (FxE x) -> enva (FxE x) ->
+		exists Fr Er, F = x\Fr /\ E = x\Er.
+induction on 1. intros. case H1.
+	case H2. search.
+	case H2.
+		apply IH to H3 _. search. apply append_prune to H3.
+		apply IH to H3 _. search. apply append_prune to H3.
+
+Theorem enva_nabla_prune_exvar : forall F E FxE, nabla x,
+	append (F x) (exvar x :: E x) (FxE x) -> enva (FxE x) ->
+		exists Fr Er, F = x\Fr /\ E = x\Er.
+induction on 1. intros. case H1.
+	case H2. search.
+	case H2.
+		apply IH to H3 _. search. apply append_prune to H3.
+		apply IH to H3 _. search. apply append_prune to H3.
+
+Theorem enva_nabla_prune_exvars : forall G F E GxFyE, nabla x y,
+	split3 (G x y) (exvar x :: F x y) (exvar y :: E x y) (GxFyE x y) -> enva (GxFyE x y) ->
+	exists Gr Fr Er, G = x\ y\ Gr /\ F = x\ y\ Fr /\ E = x\ y\ Er.
+intros. case H1 (keep). apply enva_nabla_prune_exvar to H4 H2. apply append_prune to H3.
+	apply enva_weaken to H4 _. apply enva_nabla_prune_exvar to H3 _.
+	apply split3_alt_inv to H1. apply enva_weaken to H8 _.
+		case H7. case H10. apply append_prune to H11. search.
+
+Theorem enva_nabla_prune_exvar_bound : forall G F E GxFyE, nabla x y,
+	split3 (G x y) (exvar x :: F x y) (bound y :: E x y) (GxFyE x y) -> enva (GxFyE x y) ->
+	exists Gr Fr Er, G = x\ y\ Gr /\ F = x\ y\ Fr /\ E = x\ y\ Er.
+intros. case H1 (keep). apply enva_nabla_prune_bound to H4 H2. apply append_prune to H3.
+	apply enva_weaken to H4 _. apply enva_nabla_prune_exvar to H3 _.
+	apply split3_alt_inv to H1. apply enva_weaken to H8 _.
+		case H7. case H10. apply append_prune to H11. search.
+
+Theorem enva_nabla_prune_bound_exvar : forall G F E GxFyE, nabla x y,
+	split3 (G x y) (bound x :: F x y) (exvar y :: E x y) (GxFyE x y) -> enva (GxFyE x y) ->
+	exists Gr Fr Er, G = x\ y\ Gr /\ F = x\ y\ Fr /\ E = x\ y\ Er.
+intros. case H1 (keep). apply enva_nabla_prune_exvar to H4 H2. apply append_prune to H3.
+	apply enva_weaken to H4 _. apply enva_nabla_prune_bound to H3 _.
+	apply split3_alt_inv to H1. apply enva_weaken to H8 _.
+		case H7. case H10. apply append_prune to H11. search.
+
+Theorem enva_nabla_prune : forall F E FxE, nabla x,
+	append (F x) (bound x :: E x) (FxE x) \/ append (F x) (exvar x :: E x) (FxE x) ->
+		enva (FxE x) -> exists Fr Er, F = x\Fr /\ E = x\Er.
+intros. case H1. backchain enva_nabla_prune_bound with x = n1.
+	backchain enva_nabla_prune_exvar with x = n1.
+%endregion
+
+% Well-formedness
+Define wfta : olist -> ty -> prop by
+	wfta E i;
+	nabla x, wfta (E x) x := nabla x, member (bound x) (E x) \/ member (exvar x) (E x);
+	wfta E (arrow A B) := wfta E A /\ wfta E B;
+	wfta E (all A) := nabla x, wfta (bound x :: E) (A x).
+
+%region Algorithmic Well-formedness Meta-theories
+Theorem wfta_weaken : forall E F G T EG EFG,
+	append E G EG -> split3 E F G EFG ->
+		wfta EG T ->
+		enva EFG ->
+		wfta EFG T.
+induction on 3. intros. case H3.
+	search.
+	unfold. intros. case H5.
+		left.
+			assert (member (bound n1) (EFG n1)). backchain split3_mem.
+			apply append_mem_inv to _ H6. case H7. search. search. search.
+		right.
+			assert (member (exvar n1) (EFG n1)). backchain split3_mem.
+			apply append_mem_inv to _ H6. case H7. search. search. search.
+	unfold. apply IH to _ _ H5 _. search. apply IH to _ _ H6 _. search.
+	unfold. intros.
+		backchain IH with E = (bound n1 :: E), F = F, EFG = (bound n1 :: EFG).
+		backchain split3_cons.
+
+Theorem wfta_prune : forall E T, nabla (x : ty),
+	wfta E (T x) -> exists Fr, T = x\Fr.
+induction on 1. intros. case H1.
+	search.
+	case H2. search.
+	case H3. search. search.
+	case H2. apply enva_member_prune to H3. apply enva_member_prune to H3.
+	apply IH to H2. apply IH to H3. search.
+	apply IH to H2. search.
+
+Theorem wfta_weaken_f : forall E F EF T,
+	append E F EF -> wfta F T -> enva EF -> wfta EF T.
+intros. backchain wfta_weaken with E = nil, F = E, G = F.
+
+Theorem wfta_open_equiv_var : forall F E FbE FxE A, nabla x,
+	append F (bound x :: E) (FbE x) -> append F (exvar x :: E) (FxE x) ->
+	enva (FbE x) -> wfta (FbE x) (A x) -> wfta (FxE x) (A x).
+induction on 4. intros. case H4. search.
+	case H5.
+		apply append_mem_inv to H1 H6. case H7.
+			apply append_mem to H2 _. search.
+			case H8. apply append_mem to H2 _ with X = bound n2. search.
+		apply append_mem_inv to H1 H6. case H7.
+			apply append_mem to H2 _. search.
+			case H8. apply append_mem to H2 _ with X = exvar n2. search.
+	apply append_mem to H2 _. search.
+	apply IH to _ _ _ H5. apply IH to _ _ _ H6. search.
+	apply IH to _ _ _ H5 with F = bound n2 :: F. unfold. intros. search.
+
+Theorem wfta_open_exvar : forall E A, nabla x,
+	enva E -> wfta E (all A) -> wfta (exvar x :: E) (A x).
+intros. case H2. apply wfta_open_equiv_var to _ _ _ H3. search.
+
+Theorem wfta_subst : forall E T X m, enva E ->
+	wfta E (T X) -> wfta E m -> wfta E (T m).
+induction on 2. intros. case H2.
+	case H4. search. search.
+	case H4. search. search.
+	case H4. apply IH to _ H5 H3 with T = T1. apply IH to _ H6 H3 with T = T2.
+		search. search.
+	case H4. unfold. assert exists T, T1 = x\y\ T y x. case H6.
+		apply IH to _ H5 _ with X = X, m = m, T = T2 n1.
+		backchain wfta_weaken_f with E = bound n1 :: nil.
+		search. search.
+
+Theorem wfta_strenthen_bound : forall F E FE FxE T, nabla x,
+	append F E FE -> append F (bound x :: E) (FxE x) ->
+	enva FE -> wfta (FxE x) T -> wfta FE T.
+induction on 4. intros. case H4.
+	search.
+	case H5.
+		apply append_mem_inv to H2 H6. case H7.
+			apply append_mem to H1 _. search.
+			case H8. apply append_mem to H1 _. search.
+		apply append_mem_inv to H2 H6. case H7.
+			apply append_mem to H1 _. search.
+			case H8. apply append_mem to H1 _. search.
+	apply IH to H1 H2 H3 H5. apply IH to H1 H2 H3 H6. search.
+	assert append (bound n2 :: F) (bound n1 :: E) (bound n2 :: FxE n1).
+		apply IH to _ H6 _ H5 with FE = bound n2 :: FE. search.
+
+Theorem wfta_strenthen_exvar : forall F E FE FxE T, nabla x,
+	append F E FE -> append F (exvar x :: E) (FxE x) ->
+	enva FE -> wfta (FxE x) T -> wfta FE T.
+induction on 4. intros. case H4.
+	search.
+	case H5.
+		apply append_mem_inv to H2 H6. case H7.
+			apply append_mem to H1 _. search.
+			case H8. apply append_mem to H1 _. search.
+		apply append_mem_inv to H2 H6. case H7.
+			apply append_mem to H1 _. search.
+			case H8. apply append_mem to H1 _. search.
+	apply IH to H1 H2 H3 H5. apply IH to H1 H2 H3 H6. search.
+	assert append (bound n2 :: F) (exvar n1 :: E) (bound n2 :: FxE n1).
+		apply IH to _ H6 _ H5 with FE = bound n2 :: FE. search.
+
+Theorem wfta_strenthen_f : forall E T, nabla x, enva E ->
+	wfta (bound x :: E) T \/ wfta (exvar x :: E) T -> wfta E T.
+intros. case H2.
+	backchain wfta_strenthen_bound with x = n1.
+	backchain wfta_strenthen_exvar with x = n1.
+
+% wft_alg_list : env -> [sub_expr] -> prop
+Define wftal : olist -> olist -> prop by
+	wftal E nil;
+	wftal E (subt A B :: Exp) := wfta E A /\ wfta E B /\ wftal E Exp.
+
+Theorem wftal_weaken : forall E F G Exp EG EFG,
+	append E G EG -> split3 E F G EFG ->
+		wftal EG Exp ->
+		enva EFG ->
+		wftal EFG Exp.
+induction on 3. intros. case H3. search.
+	apply IH to _ _ H7 _. unfold.
+		backchain wfta_weaken. backchain wfta_weaken. search.
+
+Theorem wftal_weaken_f : forall F E FE Exp,
+	append E F FE -> wftal F Exp -> enva FE -> wftal FE Exp.
+induction on 2. intros. case H2. search.
+	apply IH to _ H6 _. unfold. backchain wfta_weaken_f. backchain wfta_weaken_f. search.
+
+Theorem wftal_strenthen_bound : forall F E FE FxE Exp, nabla x,
+	append F E FE -> append F (bound x :: E) (FxE x) ->
+	enva FE -> wftal (FxE x) Exp -> wftal FE Exp.
+induction on 4. intros. case H4. search.
+	unfold. backchain wfta_strenthen_bound with x = n1.
+		backchain wfta_strenthen_bound with x = n1.
+	backchain IH with x = n1.
+
+Theorem wftal_strenthen_exvar : forall F E FE FxE Exp, nabla x,
+	append F E FE -> append F (exvar x :: E) (FxE x) ->
+	enva FE -> wftal (FxE x) Exp -> wftal FE Exp.
+induction on 4. intros. case H4. search.
+	unfold. backchain wfta_strenthen_exvar with x = n1.
+		backchain wfta_strenthen_exvar with x = n1.
+	backchain IH with x = n1.
+
+Theorem wftal_strenthen_f : forall E Exp, nabla x, enva E ->
+	wftal (bound x :: E) Exp \/ wftal (exvar x :: E) Exp -> wftal E Exp.
+intros. case H2. backchain wftal_strenthen_bound with x = n1.
+	backchain wftal_strenthen_exvar with x = n1.
+
+Theorem wftal_subst : forall E Exp X m, enva E ->
+	wftal E (Exp X) -> wfta E m -> wftal E (Exp m).
+induction on 2. intros. case H2.
+	case H4. search.
+	case H4. apply IH to H1 H7 H3 with Exp = Exp3.
+		case H8. unfold.
+			backchain wfta_subst with T = Exp4.
+			backchain wfta_subst with T = Exp5.
+			search.
+
+Theorem wfta_wft_env : forall E T, env E -> wfta E T -> wft E T.
+induction on 2. intros. case H2.
+	search.
+	case H3. search. apply env_mem to H1 _.
+	unfold. backchain IH. backchain IH.
+	unfold. intros. backchain IH.
+
+Theorem wftal_wft_env : forall E Exp, env E -> wftal E Exp -> wftl E Exp.
+induction on 2. intros. case H2. search.
+	unfold. backchain wfta_wft_env. backchain wfta_wft_env. backchain IH.
+%endregion
+
+% sub_expr
+Define exprs : olist -> prop by
+	exprs nil;
+	exprs (subt A B :: Exp) := exprs Exp.
+
+Theorem exprs_subst : forall Exp (X : ty) Y, exprs (Exp X) -> exprs (Exp Y).
+induction on 1. intros. case H1. case H2. search.
+	case H2. apply IH to H3 with Exp = Exp3, Y = Y. case H4. search.
+Theorem exprs_subst_nabla : forall Exp Y, nabla (x : ty), exprs (Exp x) -> exprs (Exp Y).
+intros. backchain exprs_subst with X = n1, Exp = Exp.
+
+% sub_alg_list : enva -> [sub_expr] -> prop
+Define subal : olist -> olist -> prop by
+	subal E nil;
+	subal E (subt i i :: Exp) := subal E Exp;
+
+	nabla x, subal (E x) (subt x x :: Exp x) := nabla x,
+			member (bound x) (E x) /\ subal (E x) (Exp x);
+	nabla x, subal (E x) (subt x x :: Exp x) := nabla x,
+			member (exvar x) (E x) /\ subal (E x) (Exp x);
+
+% #5 [..., exvar x, ..., exvar y, ...] |- ex x <: ex y => x = y
+	nabla x y, subal (E x y) (subt x y :: Exp x y) := exists E1 E2 E3, nabla x y,
+			split3 E1 (exvar x :: E2) (exvar y :: E3) (E x y)
+				/\ subal (E x y) (Exp y y);
+% #6 [..., exvar y, ..., exvar x, ...] |- ex x <: ex y => y = x
+	nabla x y, subal (E x y) (subt x y :: Exp x y) := exists E1 E2 E3, nabla x y,
+			split3 E1 (exvar y :: E2) (exvar x :: E3) (E x y)
+				/\ subal (E x y) (Exp x x);
+
+% #7 [..., exvar x, ..., bound y, ...] |- ex x <: var y => x = y
+	nabla x y, subal (E x y) (subt x y :: Exp x y) := exists E1 E2 E3, nabla x y,
+			split3 E1 (exvar x :: E2) (bound y :: E3) (E x y)
+				/\ subal (E x y) (Exp y y);
+% #8 [..., exvar x, ..., bound y, ...] |- var y <: ex x => x = y
+	nabla x y, subal (E x y) (subt y x :: Exp x y) := exists E1 E2 E3, nabla x y,
+			split3 E1 (exvar x :: E2) (bound y :: E3) (E x y)
+				/\ subal (E x y) (Exp y y);
+
+% #9  [exvar x] |- ex x <: 1 => x = 1
+	nabla x, subal (E x) (subt x i :: Exp x) := exists E1 E2, nabla x,
+			append E1 (exvar x :: E2) (E x) /\ subal (E x) (Exp i);
+% #10 [exvar x] |- 1 <: ex x => x = 1
+	nabla x, subal (E x) (subt i x :: Exp x) := exists E1 E2, nabla x,
+			append E1 (exvar x :: E2) (E x) /\ subal (E x) (Exp i);
+
+	subal E (subt (arrow A1 A2) (arrow B1 B2) :: Exp) :=
+			subal E (subt B1 A1 :: subt A2 B2 :: Exp);
+
+	nabla x, subal (E x) (subt x (arrow A B) :: Exp x) := exists E1 E2 F, nabla x y z,
+			append E1 (exvar x :: E2) (E x) /\
+				append E1 (exvar y :: exvar z :: E2) (F y z) /\
+				subal (F y z) (subt (arrow y z) (arrow A B) :: Exp (arrow y z));
+
+	nabla x, subal (E x) (subt (arrow A B) x :: Exp x) := exists E1 E2 F, nabla x y z,
+			append E1 (exvar x :: E2) (E x) /\
+				append E1 (exvar y :: exvar z :: E2) (F y z) /\
+				subal (F y z) (subt (arrow A B) (arrow y z) :: Exp (arrow y z));
+
+	subal E (subt A (all B) :: Exp) := nabla x, subal (bound x :: E) (subt A (B x) :: Exp);
+	subal E (subt (all A) B :: Exp) := nabla x, subal (exvar x :: E) (subt (A x) B :: Exp).
+
+Define suba : olist -> ty -> ty -> prop by suba E A B := subal E (subt A B :: nil).
+
+%region Complicated Environment Manipulations
+Theorem split3_XY_insert_thm : forall E F G EG EFG E1 E2 E3 X Y, append E G EG ->
+	split3 E F G EFG -> enva F -> split3 E1 (X :: E2) (Y :: E3) EG -> (X = Y -> false) ->
+	enva EFG -> exists F1 F2 F3, split3 F1 (X :: F2) (Y :: F3) EFG.
+induction on 3. intros. case H3 (keep).
+	apply split3_alt_inv to H2. case H7. apply append_det to *H8 H1. search.
+	apply split3_alt_inv to H2. case H8. apply enva_nabla_prune to _ H6.
+		apply append_prune to H10. apply append_prune_AB to H1.
+		case H4 (keep). apply append_prune to H12. apply append_prune to H11.
+		apply append_total_E to H9 with B = Er. apply split3_alt to H10 H13.
+		apply enva_weaken_mid to H9 _ _. apply IH to _ H14 H7 _ _ _.
+		apply insert_mid_split3 to H13 H9 H16. case H17.
+			search.
+			case H18. case H19. case H20 (keep).
+				apply append_assoc_inv to _ H21 with B = bound n1 :: nil. search.
+				case H19. search.
+			case H18. case H19. apply split3_alt_inv to H20.
+				apply append_assoc_inv to _ H21 with B = bound n1 :: nil. case H23.
+				apply split3_alt to H24 H22. search.
+				case H19. search.
+	apply split3_alt_inv to H2. case H8. apply enva_nabla_prune to _ H6.
+		apply append_prune to H10. apply append_prune_AB to H1.
+		case H4 (keep). apply append_prune to H12. apply append_prune to H11.
+		apply append_total_E to H9 with B = Er. apply split3_alt to H10 H13.
+		apply enva_weaken_mid to H9 _ _. apply IH to _ H14 H7 _ _ _.
+		apply insert_mid_split3 to H13 H9 H16. case H17.
+			search.
+			case H18. case H19. case H20 (keep).
+				apply append_assoc_inv to _ H21 with B = exvar n1 :: nil. search.
+				case H19. search.
+			case H18. case H19. apply split3_alt_inv to H20.
+				apply append_assoc_inv to _ H21 with B = exvar n1 :: nil. case H23.
+				apply split3_alt to H24 H22. search.
+				case H19. search.
+
+Theorem split3_XY_insert : forall E F G EG EFG E1 E2 E3 X Y, append E G EG ->
+	split3 E F G EFG -> split3 E1 (X :: E2) (Y :: E3) EG -> enva EFG ->
+	exists F1 F2 F3, split3 F1 (X :: F2) (Y :: F3) EFG.
+intros. backchain split3_XY_insert_thm. case H2. apply enva_weaken to H6 _.
+	apply enva_weaken to H5 _. search.
+	apply enva_weaken_all to _ _ _. apply split3_alt_inv to H3. apply enva_weaken to H7 _.
+		case H9. case H6.
+			case H6. apply append_prune to H11.
+			case H6. apply append_prune to H11.
+
+
+Theorem enva_mid_det : forall E F EXF X A B, enva EXF -> append E (X :: F) EXF ->
+	append A (X :: B) EXF -> A = E /\ B = F.
+induction on 2. intros. case H2.
+	case H1. case H3. search. apply append_prune to H5. case H3. search. apply append_prune to H5.
+	case H3. case H1. apply append_prune to H4. apply append_prune to H4.
+		case H1. apply IH to _ H4 H5. search. apply IH to _ H4 H5. search.
+
+
+Theorem split3_XY_extract_enva : forall F E AB Gx Fx Ex GxFyE X Y Z,
+	append F E AB -> append F (X :: E) GxFyE -> enva GxFyE ->
+	split3 Gx (Y :: Fx) (Z :: Ex) GxFyE -> (X = Y -> false) -> (X = Z -> false) ->
+	exists F1 F2 F3, split3 F1 (Y :: F2) (Z :: F3) AB.
+intros. assert member X GxFyE. backchain append_mem. apply split3_mem_inv to H4 H7. case H8.
+	apply single_append to H9. apply split3_alt_inv to H4. apply append_assoc to H10 H12.
+		case H13. apply enva_mid_det to _ H2 *H14. apply append_assoc_inv to H15 H1.
+		apply split3_alt to H11 H17. search.
+	apply single_append to H9. case H10 (keep). apply H5 to _.
+		case H4 (keep). apply append_assoc_inv to H10 H12. apply append_assoc to H15 H13.
+		case H16. apply enva_mid_det to _ H2 *H17. apply append_total_E to H15 with B = B.
+		apply append_assoc to H14 H19. case H20. apply append_assoc_inv to H18 H1.
+		apply append_det to *H23 H19. search.
+	apply single_append to H9. case H10 (keep). apply H6 to _.
+		case H4. apply append_assoc_inv to H10 H13. apply enva_mid_det to _ H2 *H15.
+		apply append_assoc to H14 H1. case H16. search.
+
+
+Theorem insert_mid_F_inst : forall E F G EG EG1 EFG EFG1 X Y Z A B C D,
+	append E G EG -> split3 E F G EFG -> append A (X :: B) EG -> append A (Y :: Z :: B) EG1 ->
+	append C (X :: D) EFG -> append C (Y :: Z :: D) EFG1 -> enva EFG ->
+	exists L R, split3 L F R EFG1 /\ append L R EG1.
+intros. assert member X EG. backchain append_mem with A = A. apply append_mem_inv to H1 H8.
+	case H9.
+		apply single_append to H10. apply append_assoc to H11 H1. case H12.
+			apply enva_mid_det to _ *H3 H13. backchain enva_weaken_all.
+			apply split3_alt_inv to H2. apply append_assoc to H11 H16. case H17.
+				apply enva_mid_det to _ *H5 H18.
+			apply append_total_E to H11 with B = (Y :: Z :: B1).
+			assert append (Y :: Z :: B1) BC1 (Y :: Z :: D).
+				apply append_assoc_inv to H21 H6. apply append_det to *H22 H20.
+			exists C1, G. split. backchain split3_alt.
+			assert append (Y :: Z :: B1) G (Y :: Z :: B). apply append_assoc_inv to H24 H4.
+				apply append_det to *H25 H20. search.
+		apply single_append to H10. apply append_assoc_inv to H11 H1.
+			apply enva_mid_det to _ *H3 H13. backchain enva_weaken_all.
+			case H2. apply append_assoc_inv to H11 H15. apply enva_mid_det to _ *H5 H17.
+			apply append_total_E to H11 with B = (Y :: Z :: D).
+			apply append_assoc to H16 H6. apply append_assoc to H14 H20.
+			exists E, BC. split. backchain split3_alt.
+			apply append_assoc to H12 H4. apply append_det to H23 H19. search.
+%endregion
+
+Theorem subal_weaken : forall E F G T EG EFG,
+	append E G EG -> split3 E F G EFG ->
+		subal EG T ->
+		enva EFG ->
+		subal EFG T.
+induction on 3. intros. case H3 (keep). search.
+	unfold. backchain IH.
+	unfold. intros. split. backchain split3_mem. apply append_mem_inv to _ H5.
+		case H7. search. search. backchain IH.
+	unfold 4. intros. split. backchain split3_mem. apply append_mem_inv to _ H5.
+		case H7. search. search. backchain IH.
+	apply split3_XY_insert to H1 H2 H5 _.
+		apply enva_nabla_prune_exvars to H7 _. unfold 5. exists Gr, Fr, Er. intros.
+			split. search. backchain IH with E = E n1 n2.
+	apply split3_XY_insert to H1 H2 H5 _.
+		apply enva_nabla_prune_exvars to H7 _. unfold 6. exists Gr, Fr, Er. intros.
+			split. search. backchain IH with E = E n1 n2.
+	apply split3_XY_insert to H1 H2 H5 _.
+		apply enva_nabla_prune_exvar_bound to H7 _. unfold 7. exists Gr, Fr, Er. intros.
+			split. search. backchain IH with E = E n1 n2.
+	apply split3_XY_insert to H1 H2 H5 _.
+		apply enva_nabla_prune_exvar_bound to H7 _. unfold 8. exists Gr, Fr, Er. intros.
+			split. search. backchain IH with E = E n1 n2.
+	apply append_single to H5. assert member (exvar n1) (EFG n1). backchain split3_mem.
+		apply append_mem_inv to _ H7. case H8. search. search.
+		apply single_append to H8. apply enva_nabla_prune to _ H4. unfold 9. exists Fr, Er. intros.
+			split. search. backchain IH.
+	apply append_single to H5. assert member (exvar n1) (EFG n1). backchain split3_mem.
+		apply append_mem_inv to _ H7. case H8. search. search.
+		apply single_append to H8. apply enva_nabla_prune to _ H4. unfold 10. exists Fr, Er. intros.
+			split. search. backchain IH.
+	unfold. backchain IH.
+	apply append_single to H5. assert member (exvar n1) (EFG n1). backchain split3_mem.
+		apply append_mem_inv to _ H8. case H9. search. search.
+		apply single_append to H9. apply enva_nabla_prune to _ H4.
+			apply append_total_E to H10 with B = exvar n2 :: exvar n3 :: Er. unfold.
+			exists Fr, Er, x\ y\ C y x. intros. split. search. search.
+			apply insert_mid_F_inst to H1 H2 H5 H6 H10 H11 _.
+			apply IH to H13 H12 H7 _.
+				permute (n1 n3) H10. apply enva_strenthen_mid to _ H10 _. search. search.
+	apply append_single to H5. assert member (exvar n1) (EFG n1). backchain split3_mem.
+		apply append_mem_inv to _ H8. case H9. search. search.
+		apply single_append to H9. apply enva_nabla_prune to _ H4.
+			apply append_total_E to H10 with B = exvar n2 :: exvar n3 :: Er. unfold.
+			exists Fr, Er, x\ y\ C y x. intros. split. search. search.
+			apply insert_mid_F_inst to H1 H2 H5 H6 H10 H11 _.
+			apply IH to H13 H12 H7 _.
+				permute (n1 n3) H10. apply enva_strenthen_mid to _ H10 _. search. search.
+	unfold. intros. assert split3 (bound n1 :: E) F G (bound n1 :: EFG). backchain split3_cons.
+		backchain IH with E = bound n1 :: E.
+	unfold. intros. assert split3 (exvar n1 :: E) F G (exvar n1 :: EFG). backchain split3_cons.
+		backchain IH with E = exvar n1 :: E.
+
+Theorem subal_weaken_exvar : forall E F T EF ExF, nabla x,
+	append E F EF -> append E (exvar x :: F) (ExF x) ->
+	subal EF T -> enva (ExF x) -> subal (ExF x) T.
+intros. backchain subal_weaken with EG = EF, EFG = ExF n1, F = exvar n1 :: nil.
+	backchain split3_alt.
+
+Theorem subal_strenthen_exvar : forall F E FxE FE T, nabla x, append F E FE ->
+	append F (exvar x :: E) (FxE x) -> subal (FxE x) T -> enva (FxE x) -> subal FE T.
+induction on 3. intros. case H3. search.
+	unfold. backchain IH with x = n1.
+	unfold. intros. split. apply append_mem_inv to _ H5. case H7. backchain append_mem.
+		case H8. backchain append_mem. backchain IH with x = n2.
+	unfold 4. intros. split. apply append_mem_inv to _ H5. case H7. backchain append_mem.
+		case H8. backchain append_mem. backchain IH with x = n2.
+	apply split3_XY_extract_enva to H1 H2 _ _ _ _. unfold 5.
+		apply enva_nabla_prune_exvars to H7 _.
+			backchain enva_weaken_mid with FxE = FxE n2 n3 n1, X = exvar n1.
+		exists Gr, Fr, Er. intros. split. search. permute (n1 n2 n3). backchain IH with x = n1.
+	apply split3_XY_extract_enva to H1 H2 _ _ _ _. unfold 6.
+		apply enva_nabla_prune_exvars to H7 _.
+			backchain enva_weaken_mid with FxE = FxE n2 n3 n1, X = exvar n1.
+		exists Gr, Fr, Er. intros. split. search. permute (n1 n2 n3). backchain IH with x = n1.
+	apply split3_XY_extract_enva to H1 H2 _ _ _ _. unfold 7.
+		apply enva_nabla_prune_exvar_bound to H7 _.
+			backchain enva_weaken_mid with FxE = FxE n2 n3 n1, X = exvar n1.
+		exists Gr, Fr, Er. intros. split. search. permute (n1 n2 n3). backchain IH with x = n1.
+	apply split3_XY_extract_enva to H1 H2 _ _ _ _. unfold 8.
+		apply enva_nabla_prune_exvar_bound to H7 _.
+			backchain enva_weaken_mid with FxE = FxE n2 n3 n1, X = exvar n1.
+		exists Gr, Fr, Er. intros. split. search. permute (n1 n2 n3). backchain IH with x = n1.
+	apply append_single to H5. assert member (exvar n2) (FE n2). backchain split3_mem.
+		apply append_mem_inv to _ H7. case H8. search. case H9. search.
+		apply single_append to H8. apply enva_weaken_mid to H2 _ H1.
+			apply enva_nabla_prune to _ H10. unfold. exists Fr, Er. intros. split. search.
+			apply IH to H1 H2 H6 _. search.
+	apply append_single to H5. assert member (exvar n2) (FE n2). backchain split3_mem.
+		apply append_mem_inv to _ H7. case H8. search. case H9. search.
+		apply single_append to H8. apply enva_weaken_mid to H2 _ H1.
+			apply enva_nabla_prune to _ H10. unfold. exists Fr, Er. intros. split. search.
+			apply IH to H1 H2 H6 _. search.
+	unfold. backchain IH with x = n1.
+	apply append_single to H5. assert member (exvar n2) (FE n2). backchain split3_mem.
+		apply append_mem_inv to _ H8. case H9. search. case H10. search.
+		apply single_append to H9. apply enva_weaken_mid to H2 _ H1.
+			apply enva_nabla_prune to _ H11.
+		apply append_total_E to H10 with B = (exvar n3 :: exvar n4 :: Er). unfold.
+		exists Fr, Er, x\ y\ C y x. intros. split. search. search.
+		apply insert_mid_F_inst to H1 _ H10 H12 H5 H6 _ with F = exvar n1 :: nil.
+			backchain split3_alt. apply append_prune to H14.
+				apply IH to H14 _ H7 _ with x = n1.
+				apply enva_strenthen_mid to _ H5 _. search. apply split3_alt_inv to H13.
+				case H15. case H17. search. search.
+	apply append_single to H5. assert member (exvar n2) (FE n2). backchain split3_mem.
+		apply append_mem_inv to _ H8. case H9. search. case H10. search.
+		apply single_append to H9. apply enva_weaken_mid to H2 _ H1.
+			apply enva_nabla_prune to _ H11.
+		apply append_total_E to H10 with B = (exvar n3 :: exvar n4 :: Er). unfold.
+		exists Fr, Er, x\ y\ C y x. intros. split. search. search.
+		apply insert_mid_F_inst to H1 _ H10 H12 H5 H6 _ with F = exvar n1 :: nil.
+			backchain split3_alt. apply append_prune to H14.
+				apply IH to H14 _ H7 _ with x = n1.
+				apply enva_strenthen_mid to _ H5 _. search. apply split3_alt_inv to H13.
+				case H15. case H17. search. search.
+	unfold. intros. permute (n1 n2).
+		assert append (bound n2 :: F) (exvar n1 :: E) (bound n2 :: FxE n1).
+		assert append (bound n2 :: F) E (bound n2 :: FE).
+		backchain IH with x = n1.
+	unfold. intros. permute (n1 n2).
+		assert append (exvar n2 :: F) (exvar n1 :: E) (exvar n2 :: FxE n1).
+		assert append (exvar n2 :: F) E (exvar n2 :: FE).
+		backchain IH with x = n1.

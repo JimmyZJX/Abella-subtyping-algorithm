@@ -1,0 +1,166 @@
+Import "trans".
+
+Theorem soundness : forall aE E Exa, enva aE -> wftal aE Exa -> subal aE Exa -> tenv aE E ->
+	exists Ex, texp aE Exa Ex /\ subl E Ex.
+induction on 3. intros. case H3.
+	% 1: nil
+	exists nil. apply texp_nil_nil to H1. search.
+	% 2: i <: i
+	case H2. apply IH to _ _ H5 _. exists (subt i i :: Ex).
+		apply texp_wft to _ _ _ _. search.
+	% 3: a <: a
+	case H2. apply IH to _ _ H6 _. exists (subt n1 n1 :: Ex n1).
+		apply tenv_bound to _ H5. split. backchain texp_wft.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 4: ^a <: ^a
+	case H2. apply IH to _ _ H6 _.
+		apply single_append to H5. apply enva_nabla_prune to _ H1.
+		apply texp_prune_exvar to H12 _. apply tenv_prune_exvar to H12 _.
+		apply texp_extract_intro to H12 _ H10.
+			apply tenv_mid_exvar_inv to H12 _ _.
+		apply wft_weaken_tenv to H13 _ _ H16.
+		apply texp_wft to _ _ _ *H17 with E = FEr1.
+		apply texp_insert to H12 _ _ *H20 _ H16 _ with Exp = x\ subt x x :: Exp x.
+		exists subt m m :: Exr. split. search.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 5: ^a <: ^b, E = ... ^b ... ^a ...
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp x n2, m = n2.
+		apply texp_prune_exvars to H5 _.
+		apply texp_extract2 to H5 _ H7.
+			apply tenv_prune to H9. apply wft_prune to H13.
+			clear H15. clear H16.
+			case H12 (keep). apply append_prune_AB to H18. apply append_prune_AB to H19.
+			apply tenv_mid_exvars_inv to H5 _ _.
+		apply wft_weaken_tenv to H19 _ _ H13.
+		apply texp_wft to _ _ _ *H17 with E = GFEr.
+		apply texp_insert2 to H5 H12 _ _ _ H14 _ H14 *H22 with Exp = x\ y\ subt y x :: Exp y x.
+		exists subt Fr1 Fr1 :: Exr. split. search.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 6: ^b <: ^a, E = ... ^b ... ^a ...
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp n1 x, m = n1.
+		apply texp_prune_exvars to H5 _.
+		apply texp_extract2 to H5 _ H7.
+			apply tenv_prune to H9. apply wft_prune to H13.
+			clear H15. clear H16.
+			case H12 (keep). apply append_prune_AB to H18. apply append_prune_AB to H19.
+			apply tenv_mid_exvars_inv to H5 _ _.
+		apply wft_weaken_tenv to H19 _ _ H13.
+		apply texp_wft to _ _ _ *H17 with E = GFEr.
+		apply texp_insert2 to H5 H12 _ _ _ H14 _ H14 *H22 with Exp = x\ y\ subt x y :: Exp x y.
+		exists subt Fr1 Fr1 :: Exr. split. search.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 7: ^a <: b, E = ... b ... ^a ...
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp x n2.
+		apply split3_alt_inv to H5. case H9. apply append_prune_AB to H11.
+		apply texp_prune_exvar to H10 H7. apply tenv_prune_exvar to H10 _.
+		apply texp_extract_empty to H10 _ *H7.
+			apply enva_weaken to H10 _. case H15. apply tenv_exist to H16.
+			apply append_mem to H11 _ with X = bound n2. apply tenv_bound to H17 _.
+			apply tenv_mid_exvar_inv to H10 _ _.
+			apply wft_weaken_tenv to H12 _ _ _ with T = n2, F = E1 n2.
+		apply texp_wft to _ _ _ *H13 with a = n2, b = n2.
+		apply texp_insert to H10 _ _ H23 _ _ _ with Exp = x\ subt x n2 :: Exp x n2.
+		exists subt n2 n2 :: Exr n2. split. search.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 8: b <: ^a, E = ... b ... ^a ...
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp x n2.
+		apply split3_alt_inv to H5. case H9. apply append_prune_AB to H11.
+		apply texp_prune_exvar to H10 H7. apply tenv_prune_exvar to H10 _.
+		apply texp_extract_empty to H10 _ *H7.
+			apply enva_weaken to H10 _. case H15. apply tenv_exist to H16.
+			apply append_mem to H11 _ with X = bound n2. apply tenv_bound to H17 _.
+			apply tenv_mid_exvar_inv to H10 _ _.
+			apply wft_weaken_tenv to H12 _ _ _ with T = n2, F = E1 n2.
+		apply texp_wft to _ _ _ *H13 with a = n2, b = n2.
+		apply texp_insert to H10 _ _ H23 _ _ _ with Exp = x\ subt n2 x :: Exp x n2.
+		exists subt n2 n2 :: Exr n2. split. search.
+			unfold. backchain sub_refl. backchain tenv_env. search.
+	% 9: ^a <: 1
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp x.
+		apply texp_prune_exvar to H5 _.
+		apply texp_extract_empty to H5 _ H7.
+			apply tenv_prune_exvar to H5 _. apply tenv_mid_exvar_inv to H5 _ _.
+		apply texp_wft to _ _ _ H10 with a = i, b = i.
+			apply enva_weaken to H5 _. case H14. apply tenv_exist to H15.
+		apply texp_insert to H5 _ _ H12 _ _ _ with Exp = x\ subt x i :: Exp x.
+		exists subt i i :: Exr. search.
+	% 10: 1 <: ^a
+	apply IH to _ _ H6 _.
+			case H2. backchain wftal_subst with Exp = x\ Exp x.
+		apply texp_prune_exvar to H5 _.
+		apply texp_extract_empty to H5 _ H7.
+			apply tenv_prune_exvar to H5 _. apply tenv_mid_exvar_inv to H5 _ _.
+		apply texp_wft to _ _ _ H10 with a = i, b = i.
+			apply enva_weaken to H5 _. case H14. apply tenv_exist to H15.
+		apply texp_insert to H5 _ _ H12 _ _ _ with Exp = x\ subt i x :: Exp x.
+		exists subt i i :: Exr. search.
+	% 11: A1 -> A2 <: B1 -> B2
+	case H2. case H6. case H7. apply IH to _ _ H5 _.
+		apply texp_uncons2 to H13. case H14. case H16.
+		apply texp_arrow_shape to *H13. search.
+	% 12: ^a <: A -> B
+	apply append_total_E to H5 with B = E3. apply tenv_mid_exvar_inv to H5 _ _.
+		apply tenv_mid_exvar to H6 _ _.
+		assert enva (F n2 n3). backchain enva_strenthen_mid.
+		apply split3_alt to _ H6 with B = exvar n2 :: nil.
+		apply IH to _ _ H7 _.
+			assert wftal (F n2 n3) (subt n3 (arrow A B) :: Exp n3).
+				backchain wftal_weaken with F = exvar n2 :: nil, G = exvar n3 :: E3.
+			apply append_mem to H6 _ with X = exvar n2.
+			apply append_mem to H6 _ with X = exvar n3.
+			backchain wftal_subst with Exp = x\ subt x (arrow A B) :: Exp x, m = arrow n2 n3.
+		apply texp_prune_exvars to _ H13.
+		apply texp_extract2 to H12 _ *H13.
+			case H16. case H17. apply tenv_det to H15 *H24.
+			apply wft_prune to H19. apply wft_prune to H21.
+			apply split3_alt_inv to *H18. case H25. apply append_prune_AB to H26.
+		apply texp_insert to H5 _ _ H23 _ _ _ with Exp = x\ subt x (arrow A B) :: Exp x.
+		search.
+	% 13: A -> B <: ^a
+	apply append_total_E to H5 with B = E3. apply tenv_mid_exvar_inv to H5 _ _.
+		apply tenv_mid_exvar to H6 _ _.
+		assert enva (F n2 n3). backchain enva_strenthen_mid.
+		apply split3_alt to _ H6 with B = exvar n2 :: nil.
+		apply IH to _ _ H7 _.
+			assert wftal (F n2 n3) (subt (arrow A B) n3 :: Exp n3).
+				backchain wftal_weaken with F = exvar n2 :: nil, G = exvar n3 :: E3.
+			apply append_mem to H6 _ with X = exvar n2.
+			apply append_mem to H6 _ with X = exvar n3.
+			backchain wftal_subst with Exp = x\ subt (arrow A B) x :: Exp x, m = arrow n2 n3.
+		apply texp_prune_exvars to _ H13.
+		apply texp_extract2 to H12 _ *H13.
+			case H16. case H17. apply tenv_det to H15 *H24.
+			apply wft_prune to H19. apply wft_prune to H21.
+			apply split3_alt_inv to *H18. case H25. apply append_prune_AB to H26.
+		apply texp_insert to H5 _ _ H23 _ _ _ with Exp = x\ subt (arrow A B) x :: Exp x.
+		search.
+	% 14: A <: \forall x. B
+	case H2. apply IH to _ _ H5 _.
+			unfold. backchain wfta_weaken_f with E = bound n1 :: nil. case H7. search.
+			backchain wftal_weaken_f with E = bound n1 :: nil.
+		case H9. apply texp_uncons to H11. apply texp_allR to H11.
+		exists (subt ar (all (z2\b z2)) :: Exr). split. search.
+			case H10. unfold. search. backchain subl_strenthen_bound_f with x = n1.
+			backchain tenv_env.
+	% 15: \forall x. A <: B
+	case H2.
+		assert wftal (exvar n1 :: aE) (subt (A n1) B :: Exp).
+			unfold. backchain wfta_open_exvar.
+				backchain wfta_weaken_f with E = exvar n1 :: nil.
+				backchain wftal_weaken_f with E = exvar n1 :: nil.
+		apply IH to _ _ H5 _. apply texp_wf to _ _ _ H10.
+		apply wftl_prune to H12.
+		case H10. apply tenv_det to H4 *H15. apply texp_uncons to H16.
+		apply texp_allL_shape to H16 _ _ _ _ _ with m = M, A = A, E1 = nil.
+		case H11. search.
+
+Theorem soundness_final : forall E A B, env E -> wfta E A -> wfta E B ->
+	suba E A B -> sub E A B.
+intros. case H4. apply tenv_on_env to H1.
+	apply soundness to _ _ _ _ with aE = E, E = E, Exa = subt A B :: nil.
+	apply texp_env_eq to H1 H8. case H9. search.

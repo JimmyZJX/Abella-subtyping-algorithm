@@ -1,0 +1,119 @@
+Import "higher".
+
+Define order : ty -> nat -> prop by
+	order i z;
+	nabla x, order x z;
+	order (arrow A B) K := exists M N, order A M /\ order B N /\ add M N K;
+	order (all A) (s K) := nabla x, order (A x) K.
+
+Theorem order_is_nat : forall A N, order A N -> is_nat N.
+induction on 1. intros. case H1. search. search. apply IH to H3.
+	backchain add_is_nat_k. apply IH to H2. search.
+
+Theorem mono_order : forall m, mono m -> order m z.
+induction on 1. intros. case H1. search. search.
+	apply IH to H2. apply IH to H3. search.
+
+Theorem mono_order_z : forall m n, mono m -> order m n -> n = z.
+induction on 1. intros. case H1. case H2. search. case H2. search.
+	case H2. apply IH to H3 _. apply IH to H4 _. case H7. search.
+
+Theorem order_subst : forall A N m X,
+	mono X -> mono m -> order (A X) N -> order (A m) N.
+induction on 3. intros. case H3.
+	case H4. search. backchain mono_order.
+	case H4. search. backchain mono_order.
+	case H4. apply IH to _ H2 H5 with A = A2. apply IH to _ H2 H6 with A = A3. search.
+		case H1. apply mono_order_z to H8 _. apply mono_order_z to H9 _. case H7.
+		backchain mono_order.
+	case H4 (keep). unfold. intros. apply IH to H1 H2 H5 with A = x\ A2 x n1. search.
+		case H1.
+
+Theorem wft_strenthen_bound : forall F E FE FxE A, nabla x,
+	append F E FE -> append F (bound x :: E) (FxE x) ->
+	env (FxE x) -> env FE -> wft (FxE x) A -> wft FE A.
+induction on 5. intros. case H5. search.
+	apply append_mem_inv to H2 H6. unfold. intros. backchain append_mem.
+		case H7. search. case H8. search.
+	apply IH to H1 H2 _ _ H6. apply IH to H1 H2 _ _ H7. search.
+	assert append (bound n2 :: F) (bound n1 :: E) (bound n2 :: FxE n1).
+		assert append (bound n2 :: F) E (bound n2 :: FE).
+		apply IH to H8 H7 _ _ H6 with x = n1. search.
+
+Theorem sub_strenthen_bound_thm : forall F E FE FxE A B m n, nabla x,
+	is_nat n -> lt m n -> order (arrow A B) m ->
+	append F E FE -> append F (bound x :: E) (FxE x) ->
+	env (FxE x) -> env FE -> sub (FxE x) A B -> sub FE A B.
+induction on 1. induction on 8. intros. case H1 (keep). apply lt_false to H2.
+	case H8. search.
+		assert split3 (F n2) (bound n1 :: nil) (E n2) (FxE n2 n1).
+			backchain split3_alt. apply split3_mem_inv to H11 _.
+				unfold. intros. case H12.
+				backchain append_mem. case H13. case H14. backchain append_mem.
+		case H3. case H12. case H13. 
+		apply add_assoc4 to H17 H20 H14.
+			assert order (arrow B3 A3) ca. assert order (arrow A4 B4) bd.
+			apply add_le_n to _ H2 H23.
+			unfold. backchain IH1 with x = n1, m = ca.
+				backchain IH1 with x = n1, m = bd.
+		assert append (bound n2 :: F) (bound n1 :: E) (bound n2 :: FxE n1).
+			assert append (bound n2 :: F) E (bound n2 :: FE).
+			case H3. case H14. assert lt K (s K).
+				apply order_is_nat to H13. apply add_total to H18 with n = K.
+				apply add_ltn to H17 H15 H19. apply lt_trans to _ H20 H2.
+				assert order (arrow A (B2 n2)) k.
+			apply IH1 to H9 H21 H22 H12 H11 _ _ H10 with x = n1. search.
+		case H3. case H13. assert lt K (s K).
+			apply order_is_nat to H16. apply add_total to H18 with n = N1.
+			apply add_ltm to H17 H15 H19. apply lt_trans to _ H20 H2.
+			apply mono_subst to H10 _ with X = i.
+			apply order_subst to _ H22 H16 with A = A2.
+			assert order (arrow (A2 (m1 i)) B) k.
+			apply sub_subst to H12 _.
+			apply IH to H9 H21 H24 H4 H5 _ _ H25. unfold. exists m1 i.
+				split. search. apply wft_subst to _ H11 _ with T = m1, m = i.
+					backchain wft_strenthen_bound with x = n1.
+				search.
+
+Theorem order_prune : forall A N, nabla (x : ty), order (A x) (N x) ->
+	exists Nr, N = x\ Nr.
+induction on 1. intros. case H1. search. search. search.
+	apply IH to H2. apply IH to H3. apply add_prune_k[ty] to H4. search.
+	apply IH to H2 with x = n1. search.
+
+Theorem order_total : forall E A B, sub E A B -> exists m, order (arrow A B) m. 
+induction on 1. intros. case H1. search. search.
+	apply IH to H2. apply IH to H3. case H4. case H5.
+		apply order_is_nat to H7. apply add_is_nat_k to _ H8.
+		apply add_total to H13 with n = m1.
+		apply add_comm to _ H8.
+		apply add_assoc4 to H15 H11 H14. apply add_comm to _ H16.
+		assert order (arrow A1 A2) ca. assert order (arrow B1 B2) bd. search.
+	apply IH to H2. apply order_prune to H3. case H3. apply add_prune[ty] to H6.
+		exists s Nr. unfold. exists mr, s nr. split. search. search. backchain add_s.
+	apply IH to H4. case H5. exists s m1. unfold. exists s M, N. split.
+		unfold. intros. backchain order_subst with A = A1. search. search.
+
+Theorem sub_strenthen_bound : forall F E FE FxE A B, nabla x,
+	append F E FE -> append F (bound x :: E) (FxE x) ->
+	env (FxE x) -> env FE -> sub (FxE x) A B -> sub FE A B.
+intros. apply order_total to H5. apply order_is_nat to H6. assert is_nat (s m).
+	backchain sub_strenthen_bound_thm with x = n1, n = s m.
+
+Theorem sub_strenthen_bound_f : forall E A B, nabla x,
+	env E -> sub (bound x :: E) A B -> sub E A B.
+intros. apply sub_strenthen_bound to _ _ _ H1 H2 with x = n1. search.
+
+Theorem sub_wft : forall E A B, env E -> sub E A B -> wft E A /\ wft E B.
+induction on 2. intros. case H2.
+	search. search.
+	apply IH to _ H3. apply IH to _ H4. search.
+	apply IH to _ H3. apply wft_strenthen_bound to _ _ _ _ H4. search.
+	apply IH to _ H5. assert wft (bound n1 :: E) (A1 m).
+		backchain wft_weaken_f with E = bound n1 :: nil.
+		apply wft_subst to _ H8 _ with T = A1, m = n1. search.
+
+Theorem sub_mono : forall E A B, env E -> mono A -> mono B ->
+	sub E A B \/ sub E B A -> A = B.
+intros. case H4. apply sub_wft to _ H5. backchain sub_mono_thm.
+	apply sub_wft to _ H5. backchain sub_mono_thm.
